@@ -30,6 +30,13 @@ export default async function RunDetail({ params }: PageProps) {
     .where(eq(schema.stages.runId, runId))
     .orderBy(asc(schema.stages.orderIdx));
 
+  const extractStage = stages.find((s) => s.stageName === "extract");
+  const extractParsed = extractStage?.parsedOutput as
+    | { confidence?: number; clarifying_questions?: string[] }
+    | null
+    | undefined;
+  const clarifyingQuestions = extractParsed?.clarifying_questions ?? [];
+
   return (
     <main className="mx-auto max-w-5xl px-6 py-12">
       <header className="mb-8 border-b border-neutral-800 pb-5">
@@ -71,6 +78,19 @@ export default async function RunDetail({ params }: PageProps) {
           </div>
         )}
       </header>
+
+      {clarifyingQuestions.length > 0 && (
+        <aside className="mb-6 rounded-md border border-amber-900/60 bg-amber-950/20 px-4 py-3 text-sm">
+          <div className="font-medium text-amber-300">
+            Pitch flagged as ambiguous — {clarifyingQuestions.length} clarifying question{clarifyingQuestions.length === 1 ? "" : "s"}
+          </div>
+          <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-amber-100/85">
+            {clarifyingQuestions.map((q, i) => (
+              <li key={i}>{q}</li>
+            ))}
+          </ul>
+        </aside>
+      )}
 
       <section className="space-y-4">
         {stages.map((s) => (

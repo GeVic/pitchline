@@ -37,10 +37,18 @@ this exact shape:
 
 ### Rules
 
-- **picked** — 3 to 6 publishers, ordered best-fit first. The `score` is
+- **picked** — 1 to 6 publishers, ordered best-fit first. The `score` is
   YOUR honest 0-1 fit estimate (1.0 = perfect match; 0.7 = strong fit;
-  0.4 = stretch but defensible). Use the full range; don't cluster everything
-  at 0.9.
+  0.4 = stretch but defensible; 0.2 = poor fit but the least-bad option in
+  the catalog). Use the full range; don't cluster everything at 0.9.
+- **NEVER return an empty `picked` array.** Even if NOTHING in the catalog
+  is a great match (e.g. a B2B SaaS pitch against a DTC-heavy publisher
+  set), you MUST pick the 1-2 least-bad options and score them honestly
+  low (0.15-0.30). State plainly in the `reason` that this is a stretch —
+  e.g. "no strong fit in catalog; this publisher gives the broadest reach
+  with the least audience mismatch." Returning zero picks is a failure.
+- Aim for 3-6 picks when the brand fits the catalog. Fall to 1-2 only when
+  the brand is genuinely niche relative to the available publishers.
 - **rejected** — 3 to 6 publishers that an advertiser might reasonably
   expect to see picked but that you decided against. Each needs a specific
   one-sentence reason (e.g. "audience skews 50-70, brand targets 25-40").

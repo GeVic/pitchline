@@ -169,6 +169,13 @@ export default function Home() {
 
   const anyActivity = stages.some((s) => s.status !== "pending");
 
+  const extractTrace = stages.find((s) => s.orderIdx === 1)?.trace;
+  const extractParsed = extractTrace?.parsedOutput as
+    | { confidence?: number; clarifying_questions?: string[] }
+    | undefined;
+  const clarifyingQuestions = extractParsed?.clarifying_questions ?? [];
+  const extractConfidence = extractParsed?.confidence;
+
   return (
     <main className="mx-auto max-w-3xl px-6 py-16">
       <div className="flex items-baseline justify-between">
@@ -216,8 +223,29 @@ export default function Home() {
         </div>
       )}
 
+      {clarifyingQuestions.length > 0 && (
+        <aside className="mt-6 rounded-md border border-amber-900/60 bg-amber-950/20 px-4 py-3 text-sm">
+          <div className="flex items-baseline justify-between">
+            <div className="font-medium text-amber-300">Low-confidence pitch</div>
+            {typeof extractConfidence === "number" && (
+              <span className="font-mono text-xs text-amber-400/80">
+                confidence · {extractConfidence.toFixed(2)}
+              </span>
+            )}
+          </div>
+          <p className="mt-1 text-xs text-amber-200/70">
+            The pipeline ran to completion, but the extract stage flagged the pitch as ambiguous. Answer these to improve the next run:
+          </p>
+          <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-amber-100/85">
+            {clarifyingQuestions.map((q, i) => (
+              <li key={i}>{q}</li>
+            ))}
+          </ul>
+        </aside>
+      )}
+
       {anyActivity && (
-        <section className="mt-8 space-y-3">
+        <section className="mt-6 space-y-3">
           {stages.map((s) => (
             <StageCard key={s.orderIdx} stage={s} />
           ))}

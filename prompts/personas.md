@@ -30,6 +30,11 @@ this exact shape:
 - 1 to 5 picks. **Typically 3 to 5.** Drop below 3 ONLY when the brand is so
   niche or narrowly targeted that inventing a fourth persona would be a
   stretch (e.g. a vertical B2B SaaS with one clear buyer).
+- **NEVER return an empty `picked` array.** Even for niche or B2B pitches
+  where no consumer persona is a clean fit, pick the 1 closest persona
+  (the buyer of the B2B product is a person too — pick whichever consumer
+  persona maps to them as professionals). State plainly in `why` that this
+  is a stretch and tag as "non-obvious". Returning zero picks is a failure.
 - Use the exact `persona_id` strings from the catalog. Do not invent IDs.
 - Each pick MUST be tagged:
   - **"obvious"** — the persona is the brand's stated/primary target.
