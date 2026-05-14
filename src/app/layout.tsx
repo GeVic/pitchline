@@ -2,8 +2,9 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Disco · Ad placement & creative generation",
-  description: "Turn a one-sentence advertiser pitch into a draft campaign.",
+  title: "Pitchline · From a one-line pitch to a full campaign",
+  description:
+    "Paste an advertiser pitch. Get publisher picks, persona-tuned ad creative, and a structured campaign config — streamed stage-by-stage.",
 };
 
 export default function RootLayout({
@@ -13,7 +14,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className="font-sans antialiased">{children}</body>
+      <body className="font-sans antialiased">
+        <div className="ambient-glow" aria-hidden />
+        {children}
+      </body>
     </html>
   );
 }
