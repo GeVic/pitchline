@@ -23,6 +23,25 @@ export type StageTrace = {
   errorMessage?: string;
 };
 
+export type PipelineEvent =
+  | { type: "run_started"; runId: string }
+  | { type: "stage_start"; orderIdx: number; name: StageName }
+  | { type: "stage_complete"; trace: StageTrace }
+  | {
+      type: "stage_failed";
+      orderIdx: number;
+      name: StageName;
+      errorMessage: string;
+    }
+  | {
+      type: "run_complete";
+      runId: string;
+      totalCostUsd: number;
+      totalDurationMs: number;
+      finalConfig: CampaignConfig;
+    }
+  | { type: "run_failed"; runId: string; errorMessage: string };
+
 export type RunResult = {
   runId: string;
   pitch: string;
@@ -34,56 +53,85 @@ export type RunResult = {
   errorMessage?: string;
 };
 
-export async function runPipeline(pitch: string): Promise<RunResult> {
+export async function* runPipelineStream(
+  pitch: string,
+): AsyncGenerator<PipelineEvent, void, void> {
   const db = getDb();
-  const inserted = await db
-    .insert(schema.runs)
-    .values({ pitch, status: "running" })
-    .returning({ id: schema.runs.id });
-  const runRow = inserted[0];
-  if (!runRow) throw new Error("Failed to create run row");
-
-  const runId = runRow.id;
   const overallStarted = Date.now();
   const traces: StageTrace[] = [];
 
+  let currentStage: { orderIdx: number; name: StageName } | null = null;
+  let runId: string | null = null;
+
   try {
+    const inserted = await db
+      .insert(schema.runs)
+      .values({ pitch, status: "running" })
+      .returning({ id: schema.runs.id });
+    const runRow = inserted[0];
+    if (!runRow) throw new Error("Failed to create run row");
+    runId = runRow.id;
+    yield { type: "run_started", runId };
+
+    // STAGE 1
+    currentStage = { orderIdx: 1, name: "extract" };
+    yield { type: "stage_start", ...currentStage };
     const extract = await executeStage({
-      runId, orderIdx: 1, name: "extract",
+      runId, ...currentStage,
       run: () => runExtract(pitch),
     });
     traces.push(extract.trace);
+    yield { type: "stage_complete", trace: extract.trace };
 
+    // STAGE 2
+    currentStage = { orderIdx: 2, name: "match" };
+    yield { type: "stage_start", ...currentStage };
     const match = await executeStage({
-      runId, orderIdx: 2, name: "match",
+      runId, ...currentStage,
       run: () => runMatch(extract.parsed),
     });
     traces.push(match.trace);
+    yield { type: "stage_complete", trace: match.trace };
 
+    // STAGE 3
+    currentStage = { orderIdx: 3, name: "personas" };
+    yield { type: "stage_start", ...currentStage };
     const personas = await executeStage({
-      runId, orderIdx: 3, name: "personas",
+      runId, ...currentStage,
       run: () => runPersonas(extract.parsed, match.parsed),
     });
     traces.push(personas.trace);
+    yield { type: "stage_complete", trace: personas.trace };
 
+    // STAGE 4
+    currentStage = { orderIdx: 4, name: "creative" };
+    yield { type: "stage_start", ...currentStage };
     const creative = await executeStage({
-      runId, orderIdx: 4, name: "creative",
+      runId, ...currentStage,
       run: () => runCreative(extract.parsed, personas.parsed),
     });
     traces.push(creative.trace);
+    yield { type: "stage_complete", trace: creative.trace };
 
+    // STAGE 5
+    currentStage = { orderIdx: 5, name: "config" };
+    yield { type: "stage_start", ...currentStage };
     const config = await executeStage({
-      runId, orderIdx: 5, name: "config",
-      run: () => runConfig({
-        extract: extract.parsed,
-        match: match.parsed,
-        personasPicked: personas.parsed,
-        creatives: creative.parsed,
-      }),
+      runId, ...currentStage,
+      run: () =>
+        runConfig({
+          extract: extract.parsed,
+          match: match.parsed,
+          personasPicked: personas.parsed,
+          creatives: creative.parsed,
+        }),
     });
     traces.push(config.trace);
+    yield { type: "stage_complete", trace: config.trace };
 
-    const totalCostUsd = traces.reduce((sum, s) => sum + s.costUsd, 0);
+    currentStage = null;
+
+    const totalCostUsd = traces.reduce((s, t) => s + t.costUsd, 0);
     const totalDurationMs = Date.now() - overallStarted;
 
     await db
@@ -98,41 +146,81 @@ export async function runPipeline(pitch: string): Promise<RunResult> {
       })
       .where(eq(schema.runs.id, runId));
 
-    return {
+    yield {
+      type: "run_complete",
       runId,
-      pitch,
-      status: "completed",
-      stages: traces,
       totalCostUsd,
       totalDurationMs,
       finalConfig: config.parsed,
     };
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : String(err);
-    const totalDurationMs = Date.now() - overallStarted;
-    const totalCostUsd = traces.reduce((sum, s) => sum + s.costUsd, 0);
-
-    await db
-      .update(schema.runs)
-      .set({
-        status: "failed",
-        errorMessage,
-        totalCostUsd,
-        totalDurationMs,
-        updatedAt: new Date(),
-      })
-      .where(eq(schema.runs.id, runId));
-
-    return {
-      runId,
-      pitch,
-      status: "failed",
-      stages: traces,
-      totalCostUsd,
-      totalDurationMs,
-      errorMessage,
-    };
+    if (currentStage) {
+      yield { type: "stage_failed", ...currentStage, errorMessage };
+    }
+    if (runId) {
+      const totalCostUsd = traces.reduce((s, t) => s + t.costUsd, 0);
+      const totalDurationMs = Date.now() - overallStarted;
+      await db
+        .update(schema.runs)
+        .set({
+          status: "failed",
+          errorMessage,
+          totalCostUsd,
+          totalDurationMs,
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.runs.id, runId));
+      yield { type: "run_failed", runId, errorMessage };
+    }
   }
+}
+
+export async function runPipeline(pitch: string): Promise<RunResult> {
+  const traces: StageTrace[] = [];
+  let runId = "";
+  let finalConfig: CampaignConfig | undefined;
+  let errorMessage: string | undefined;
+  let totalCostUsd = 0;
+  let totalDurationMs = 0;
+  let status: "completed" | "failed" = "failed";
+
+  for await (const ev of runPipelineStream(pitch)) {
+    switch (ev.type) {
+      case "run_started":
+        runId = ev.runId;
+        break;
+      case "stage_complete":
+        traces.push(ev.trace);
+        break;
+      case "run_complete":
+        status = "completed";
+        totalCostUsd = ev.totalCostUsd;
+        totalDurationMs = ev.totalDurationMs;
+        finalConfig = ev.finalConfig;
+        break;
+      case "run_failed":
+        status = "failed";
+        errorMessage = ev.errorMessage;
+        break;
+      case "stage_failed":
+        errorMessage = ev.errorMessage;
+        break;
+      default:
+        break;
+    }
+  }
+
+  return {
+    runId,
+    pitch,
+    status,
+    stages: traces,
+    totalCostUsd,
+    totalDurationMs,
+    ...(finalConfig !== undefined ? { finalConfig } : {}),
+    ...(errorMessage !== undefined ? { errorMessage } : {}),
+  };
 }
 
 async function executeStage<T>(opts: {

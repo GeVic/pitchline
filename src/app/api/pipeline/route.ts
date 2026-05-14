@@ -1,6 +1,5 @@
-import { NextResponse } from "next/server";
 import { z } from "zod";
-import { runPipeline } from "@/pipeline/run";
+import { runPipelineStream } from "@/pipeline/run";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,24 +13,43 @@ export async function POST(req: Request) {
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    return Response.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
   const parsed = BodySchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json(
+    return Response.json(
       { error: parsed.error.issues[0]?.message ?? "Invalid body" },
       { status: 400 },
     );
   }
 
-  try {
-    const result = await runPipeline(parsed.data.pitch);
-    return NextResponse.json(result, {
-      status: result.status === "completed" ? 200 : 500,
-    });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown error";
-    return NextResponse.json({ error: message }, { status: 500 });
-  }
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      const send = (eventType: string, data: unknown) => {
+        const payload = `event: ${eventType}\ndata: ${JSON.stringify(data)}\n\n`;
+        controller.enqueue(encoder.encode(payload));
+      };
+      try {
+        for await (const ev of runPipelineStream(parsed.data.pitch)) {
+          send(ev.type, ev);
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Unknown error";
+        send("error", { message });
+      } finally {
+        controller.close();
+      }
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      "content-type": "text/event-stream; charset=utf-8",
+      "cache-control": "no-cache, no-transform",
+      "connection": "keep-alive",
+      "x-accel-buffering": "no",
+    },
+  });
 }
