@@ -171,7 +171,15 @@ export default function Home() {
 
   return (
     <main className="mx-auto max-w-3xl px-6 py-16">
-      <h1 className="text-2xl font-semibold tracking-tight">Disco</h1>
+      <div className="flex items-baseline justify-between">
+        <h1 className="text-2xl font-semibold tracking-tight">Disco</h1>
+        <a
+          href="/debug"
+          className="font-mono text-xs text-neutral-400 hover:text-white"
+        >
+          /debug →
+        </a>
+      </div>
       <p className="mt-3 text-sm text-neutral-400">
         Paste a one-sentence advertiser pitch. The 5-stage pipeline streams its progress as it runs.
       </p>
