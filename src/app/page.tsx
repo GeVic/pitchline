@@ -30,6 +30,22 @@ const INITIAL_STAGES: ReadonlyArray<StageState> = [
   { orderIdx: 5, name: "config", model: "code", status: "pending" },
 ];
 
+const EXAMPLE_PITCHES: { label: string; pitch: string }[] = [
+  {
+    label: "Confident",
+    pitch:
+      "We sell premium dog food for senior dogs, targeting owners who care about joint health and longevity. Grain-free, vet-formulated, subscription-based.",
+  },
+  {
+    label: "Niche / B2B",
+    pitch: "B2B SaaS for dental practices. We automate their patient recall workflow.",
+  },
+  {
+    label: "Vague",
+    pitch: "We help people feel better.",
+  },
+];
+
 function cloneStages(): StageState[] {
   return INITIAL_STAGES.map((s) => ({ ...s }));
 }
@@ -188,7 +204,7 @@ export default function Home() {
         </a>
       </div>
       <p className="mt-3 text-sm text-neutral-400">
-        Paste a one-sentence advertiser pitch. The 5-stage pipeline streams its progress as it runs.
+        Paste a pitch. Get publisher picks, persona-tuned ad creative, and a structured campaign config — streamed stage-by-stage.
       </p>
 
       <form onSubmit={onSubmit} className="mt-8 flex flex-col gap-3">
@@ -200,6 +216,20 @@ export default function Home() {
           className="w-full rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm placeholder:text-neutral-600 focus:border-neutral-500 focus:outline-none"
           disabled={loading}
         />
+        <div className="flex flex-wrap items-center gap-2 text-xs text-neutral-500">
+          <span className="text-neutral-600">try:</span>
+          {EXAMPLE_PITCHES.map((ex) => (
+            <button
+              key={ex.label}
+              type="button"
+              onClick={() => setPitch(ex.pitch)}
+              disabled={loading}
+              className="rounded-full border border-neutral-800 bg-neutral-900 px-2.5 py-1 text-xs text-neutral-300 hover:border-neutral-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {ex.label}
+            </button>
+          ))}
+        </div>
         <div className="flex items-center gap-3">
           <button
             type="submit"
