@@ -2,7 +2,11 @@ import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import type { CallResult } from "@/lib/claude";
 import { runExtract } from "./extract";
-import type { Extract } from "@/schemas";
+import { runMatch } from "./match";
+import { runPersonas } from "./personas";
+import { runCreative } from "./creative";
+import { runConfig } from "./config";
+import type { CampaignConfig } from "@/schemas";
 
 type StageName = (typeof schema.stageNameEnum.enumValues)[number];
 
@@ -26,6 +30,7 @@ export type RunResult = {
   stages: StageTrace[];
   totalCostUsd: number;
   totalDurationMs: number;
+  finalConfig?: CampaignConfig;
   errorMessage?: string;
 };
 
@@ -40,22 +45,46 @@ export async function runPipeline(pitch: string): Promise<RunResult> {
 
   const runId = runRow.id;
   const overallStarted = Date.now();
-  const stages: StageTrace[] = [];
+  const traces: StageTrace[] = [];
 
   try {
     const extract = await executeStage({
-      runId,
-      orderIdx: 1,
-      name: "extract",
+      runId, orderIdx: 1, name: "extract",
       run: () => runExtract(pitch),
     });
-    stages.push(extract);
+    traces.push(extract.trace);
 
-    // Stages 2–5 land in build sequence step 4.
+    const match = await executeStage({
+      runId, orderIdx: 2, name: "match",
+      run: () => runMatch(extract.parsed),
+    });
+    traces.push(match.trace);
 
-    const totalCostUsd = stages.reduce((sum, s) => sum + s.costUsd, 0);
+    const personas = await executeStage({
+      runId, orderIdx: 3, name: "personas",
+      run: () => runPersonas(extract.parsed, match.parsed),
+    });
+    traces.push(personas.trace);
+
+    const creative = await executeStage({
+      runId, orderIdx: 4, name: "creative",
+      run: () => runCreative(extract.parsed, personas.parsed),
+    });
+    traces.push(creative.trace);
+
+    const config = await executeStage({
+      runId, orderIdx: 5, name: "config",
+      run: () => runConfig({
+        extract: extract.parsed,
+        match: match.parsed,
+        personasPicked: personas.parsed,
+        creatives: creative.parsed,
+      }),
+    });
+    traces.push(config.trace);
+
+    const totalCostUsd = traces.reduce((sum, s) => sum + s.costUsd, 0);
     const totalDurationMs = Date.now() - overallStarted;
-    const confidence = (extract.parsedOutput as Extract).confidence;
 
     await db
       .update(schema.runs)
@@ -63,7 +92,8 @@ export async function runPipeline(pitch: string): Promise<RunResult> {
         status: "completed",
         totalCostUsd,
         totalDurationMs,
-        confidence,
+        confidence: extract.parsed.confidence,
+        finalConfig: config.parsed as unknown as Record<string, unknown>,
         updatedAt: new Date(),
       })
       .where(eq(schema.runs.id, runId));
@@ -72,14 +102,15 @@ export async function runPipeline(pitch: string): Promise<RunResult> {
       runId,
       pitch,
       status: "completed",
-      stages,
+      stages: traces,
       totalCostUsd,
       totalDurationMs,
+      finalConfig: config.parsed,
     };
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : String(err);
     const totalDurationMs = Date.now() - overallStarted;
-    const totalCostUsd = stages.reduce((sum, s) => sum + s.costUsd, 0);
+    const totalCostUsd = traces.reduce((sum, s) => sum + s.costUsd, 0);
 
     await db
       .update(schema.runs)
@@ -96,7 +127,7 @@ export async function runPipeline(pitch: string): Promise<RunResult> {
       runId,
       pitch,
       status: "failed",
-      stages,
+      stages: traces,
       totalCostUsd,
       totalDurationMs,
       errorMessage,
@@ -109,7 +140,7 @@ async function executeStage<T>(opts: {
   orderIdx: number;
   name: StageName;
   run: () => Promise<CallResult<T>>;
-}): Promise<StageTrace> {
+}): Promise<{ trace: StageTrace; parsed: T }> {
   const db = getDb();
   const inserted = await db
     .insert(schema.stages)
@@ -142,15 +173,18 @@ async function executeStage<T>(opts: {
       .where(eq(schema.stages.id, stageRow.id));
 
     return {
-      name: opts.name,
-      orderIdx: opts.orderIdx,
-      status: "completed",
-      parsedOutput: r.parsed,
-      model: r.model,
-      tokensIn: r.tokensIn,
-      tokensOut: r.tokensOut,
-      durationMs: r.durationMs,
-      costUsd: r.costUsd,
+      trace: {
+        name: opts.name,
+        orderIdx: opts.orderIdx,
+        status: "completed",
+        parsedOutput: r.parsed,
+        model: r.model,
+        tokensIn: r.tokensIn,
+        tokensOut: r.tokensOut,
+        durationMs: r.durationMs,
+        costUsd: r.costUsd,
+      },
+      parsed: r.parsed,
     };
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : String(err);
