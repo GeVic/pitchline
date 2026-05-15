@@ -2,6 +2,7 @@ import Link from "next/link";
 import { asc, eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { getDb, schema } from "@/lib/db";
+import { MatchView } from "@/components/MatchView";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -182,9 +183,13 @@ function StageBlock({ stage }: { stage: typeof schema.stages.$inferSelect }) {
           <summary className="cursor-pointer bg-[#0e0d0c]/40 px-4 py-2 font-mono text-xs text-[#a8a195] hover:text-[#ece8e0]">
             parsed output (validated)
           </summary>
-          <pre className="overflow-x-auto px-4 py-3 text-xs leading-relaxed text-[#ece8e0]">
-            {JSON.stringify(stage.parsedOutput, null, 2)}
-          </pre>
+          {stage.stageName === "match" ? (
+            <MatchView parsedOutput={stage.parsedOutput} />
+          ) : (
+            <pre className="overflow-x-auto px-4 py-3 text-xs leading-relaxed text-[#ece8e0]">
+              {JSON.stringify(stage.parsedOutput, null, 2)}
+            </pre>
+          )}
         </details>
       )}
 

@@ -27,11 +27,23 @@ export async function runCreative(
     "Personas to write creative for (full records, in pick order):",
     JSON.stringify(fullPersonas, null, 2),
   ].join("\n");
-  return callClaudeJson({
+  const result = await callClaudeJson({
     model: "sonnet",
     system,
     user,
     schema: CreativesSchema,
     maxTokens: 2500,
   });
+
+  // Sanity check: each creative must reference one of the personas we picked.
+  const expected = new Set(picked.picked.map((p) => p.persona_id));
+  const stray = result.parsed.creatives
+    .map((c) => c.persona_id)
+    .filter((id) => !expected.has(id));
+  if (stray.length > 0) {
+    throw new Error(
+      `Stage 4 (creative) referenced personas not in the picked set: ${stray.join(", ")}`,
+    );
+  }
+  return result;
 }
