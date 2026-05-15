@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { runPipelineStream } from "@/pipeline/run";
+import { getClientKey, rateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -8,7 +9,26 @@ const BodySchema = z.object({
   pitch: z.string().trim().min(3, "Pitch is too short").max(2000),
 });
 
+const RATE_LIMIT = { max: 10, windowMs: 60_000 };
+
 export async function POST(req: Request) {
+  const rl = rateLimit(getClientKey(req), RATE_LIMIT);
+  if (!rl.allowed) {
+    return Response.json(
+      {
+        error: `Too many requests. Try again in ${rl.retryAfterSeconds}s.`,
+      },
+      {
+        status: 429,
+        headers: {
+          "Retry-After": String(rl.retryAfterSeconds),
+          "X-RateLimit-Limit": String(RATE_LIMIT.max),
+          "X-RateLimit-Remaining": "0",
+        },
+      },
+    );
+  }
+
   let body: unknown;
   try {
     body = await req.json();

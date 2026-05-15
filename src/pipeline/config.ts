@@ -192,5 +192,6 @@ export async function runConfig(inputs: ConfigInputs): Promise<CallResult<Campai
     tokensOut: 0,
     costUsd: 0,
     durationMs,
+    attempts: 1,
   };
 }
