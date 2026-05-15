@@ -126,16 +126,6 @@ export default async function RunDetail({ params }: PageProps) {
           )}
         </section>
 
-        {run.finalConfig != null && (
-          <section className="mt-10">
-            <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#a8a195]">
-              Final campaign config
-            </h2>
-            <pre className="overflow-x-auto rounded-2xl border border-[#2a2620] bg-[#16140f]/70 p-5 text-xs leading-relaxed text-[#ece8e0] backdrop-blur">
-              {JSON.stringify(run.finalConfig, null, 2)}
-            </pre>
-          </section>
-        )}
       </main>
     </>
   );
