@@ -15,7 +15,6 @@ import { parseSseStream } from "@/lib/sse";
 export default function Home() {
   const [pitch, setPitch] = useState("");
   const [stages, setStages] = useState<StageState[]>(cloneInitialStages());
-  const [runId, setRunId] = useState<string | null>(null);
   const [runMeta, setRunMeta] = useState<RunMeta | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -54,7 +53,6 @@ export default function Home() {
 
     setLoading(true);
     setError(null);
-    setRunId(null);
     setRunMeta(null);
     setStages(cloneInitialStages());
 
@@ -80,7 +78,8 @@ export default function Home() {
         const d = ev.data;
         switch (ev.type) {
           case "run_started":
-            if (typeof d.runId === "string") setRunId(d.runId);
+            // runId is intentionally not surfaced in the customer UI;
+            // /debug uses the persisted runs.id directly.
             break;
           case "stage_start":
             if (typeof d.orderIdx === "number") {
@@ -169,7 +168,6 @@ export default function Home() {
           pitch={pitch}
           onPitchChange={setPitch}
           loading={loading}
-          runId={runId}
           onSubmit={onSubmit}
         />
 

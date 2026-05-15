@@ -21,7 +21,6 @@ type Props = {
   pitch: string;
   onPitchChange: (value: string) => void;
   loading: boolean;
-  runId: string | null;
   onSubmit: (e: React.FormEvent) => void;
 };
 
@@ -29,7 +28,6 @@ export function PitchForm({
   pitch,
   onPitchChange,
   loading,
-  runId,
   onSubmit,
 }: Props) {
   return (
@@ -60,19 +58,14 @@ export function PitchForm({
         ))}
       </div>
 
-      <div className="flex items-center justify-center gap-4">
+      <div className="flex items-center justify-center">
         <button
           type="submit"
           disabled={loading || pitch.trim().length < 3}
           className="rounded-full bg-[#e8b97c] px-7 py-3 text-sm font-medium text-[#1a1410] shadow-[0_8px_24px_rgba(232,185,124,0.18)] transition-all hover:bg-[#f0c690] hover:shadow-[0_8px_30px_rgba(232,185,124,0.28)] disabled:cursor-not-allowed disabled:bg-[#3a352d] disabled:text-[#6c665d] disabled:shadow-none"
         >
-          {loading ? "Streaming…" : "Run pipeline →"}
+          {loading ? "Building your campaign…" : "Build my campaign →"}
         </button>
-        {runId && (
-          <span className="font-mono text-xs text-[#6c665d]">
-            run · {runId.slice(0, 8)}
-          </span>
-        )}
       </div>
     </form>
   );
