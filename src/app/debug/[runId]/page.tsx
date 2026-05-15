@@ -2,7 +2,7 @@ import Link from "next/link";
 import { asc, eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { getDb, schema } from "@/lib/db";
-import { MatchView } from "@/components/MatchView";
+import { StageView } from "@/components/StageView";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -88,15 +88,12 @@ export default async function RunDetail({ params }: PageProps) {
           />
         </div>
 
-        <details
-          className="mb-6 rounded-2xl border border-[#2a2620] bg-[#16140f]/60 px-4 py-3 text-sm text-[#ece8e0] backdrop-blur"
-          open
-        >
-          <summary className="cursor-pointer text-[#a8a195]">
-            <span className="font-mono text-xs text-[#6c665d]">pitch:</span>{" "}
-            <span className="text-[#ece8e0]">{run.pitch}</span>
-          </summary>
-        </details>
+        <section className="mb-6 rounded-2xl border border-[#2a2620] bg-[#16140f]/60 px-4 py-3 backdrop-blur">
+          <div className="font-mono text-[10px] uppercase tracking-wider text-[#6c665d]">
+            pitch
+          </div>
+          <p className="mt-1 text-sm leading-relaxed text-[#ece8e0]">{run.pitch}</p>
+        </section>
 
         {run.errorMessage && (
           <div className="mb-6 rounded-2xl border border-red-900/50 bg-red-950/20 px-4 py-3 font-mono text-xs text-red-300">
@@ -183,13 +180,10 @@ function StageBlock({ stage }: { stage: typeof schema.stages.$inferSelect }) {
           <summary className="cursor-pointer bg-[#0e0d0c]/40 px-4 py-2 font-mono text-xs text-[#a8a195] hover:text-[#ece8e0]">
             parsed output (validated)
           </summary>
-          {stage.stageName === "match" ? (
-            <MatchView parsedOutput={stage.parsedOutput} />
-          ) : (
-            <pre className="overflow-x-auto px-4 py-3 text-xs leading-relaxed text-[#ece8e0]">
-              {JSON.stringify(stage.parsedOutput, null, 2)}
-            </pre>
-          )}
+          <StageView
+            stageName={stage.stageName}
+            parsedOutput={stage.parsedOutput}
+          />
         </details>
       )}
 
